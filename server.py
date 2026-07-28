@@ -264,7 +264,17 @@ def _extract_asset_urls(task: dict) -> list:
 async def _wait_for_task(task_id: str, wait_seconds: float) -> dict:
     deadline = time.monotonic() + min(wait_seconds, MAX_WAIT_SECONDS)
     while True:
-        task = await _api("GET", f"/v1/task/{task_id}")
+        try:
+            task = await _api("GET", f"/v1/task/{task_id}")
+        except ValueError as exc:
+            message = str(exc)
+            transient = any(
+                marker in message for marker in ("HTTP 502", "HTTP 503", "HTTP 504", "server_busy")
+            )
+            if transient and time.monotonic() < deadline:
+                await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                continue
+            raise
         status = task.get("status")
         if status == "done":
             task["asset_urls"] = _extract_asset_urls(task)
