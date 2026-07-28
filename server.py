@@ -41,7 +41,8 @@ mcp = FastMCP(
     name="ai33-pro",
     instructions=(
         "Tools for the AI33 Pro media generation API: text-to-speech, dialogue, "
-        "voice cloning, speech-to-text, dubbing, sound effects, music, and image "
+        "voice cloning, voice changing/isolation, speech-to-text, dubbing, sound "
+        "effects, music (Suno and MiniMax), pronunciation dictionaries, and image "
         "generation.\n\n"
         "Typical flow: list voices with ai33_list_voices, create a generation task "
         "(e.g. ai33_text_to_speech), then read the result. Creation tools accept a "
@@ -216,6 +217,7 @@ def _extract_asset_urls(task: dict) -> list:
     meta = task.get("metadata") or {}
     for key, kind in (
         ("audio_url", "audio"),
+        ("replacement_audio_url", "audio"),
         ("srt_url", "captions"),
         ("json_url", "transcript"),
         ("output_uri", "audio"),
@@ -234,6 +236,22 @@ def _extract_asset_urls(task: dict) -> list:
             urls.append({"kind": "music", "url": item["audio_url"], "title": item.get("title")})
         if item.get("cover_url"):
             urls.append({"kind": "cover", "url": item["cover_url"]})
+    if meta.get("image_url"):
+        urls.append({"kind": "cover", "url": meta["image_url"]})
+    for url in meta.get("all_audio_urls") or []:
+        urls.append({"kind": "music", "url": url})
+    for clip in ((meta.get("suno_result") or {}).get("clips")) or []:
+        if clip.get("audio_url"):
+            urls.append(
+                {
+                    "kind": "music",
+                    "url": clip["audio_url"],
+                    "title": clip.get("title"),
+                    "duration": clip.get("duration"),
+                }
+            )
+        if clip.get("image_url"):
+            urls.append({"kind": "cover", "url": clip["image_url"]})
     seen = set()
     deduped = []
     for entry in urls:
@@ -259,6 +277,15 @@ async def _wait_for_task(task_id: str, wait_seconds: float) -> dict:
                 f"Task is still '{status}'. Poll again with ai33_wait_for_task "
                 f"(task_id='{task_id}') until status is 'done'."
             )
+            meta = task.get("metadata") or {}
+            previews = []
+            if meta.get("stream_url"):
+                previews.append(meta["stream_url"])
+            for clip in ((meta.get("suno_stream_result") or {}).get("clips")) or []:
+                if clip.get("stream_url"):
+                    previews.append(clip["stream_url"])
+            if previews:
+                task["preview_stream_urls"] = previews
             return task
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
@@ -367,6 +394,10 @@ async def ai33_text_to_speech(
         bool, Field(description="Also produce SRT captions and word-level JSON transcript.")
     ] = False,
     file_name: Annotated[Optional[str], Field(description="Optional output file name.")] = None,
+    pronunciation_dictionary_id: Annotated[
+        Optional[int],
+        Field(description="Apply a pronunciation dictionary (see ai33_list_dictionaries); only the audio changes."),
+    ] = None,
     wait_seconds: Annotated[
         int,
         Field(ge=0, le=MAX_WAIT_SECONDS, description="How long to wait for completion. 0 returns the task_id immediately."),
@@ -385,6 +416,7 @@ async def ai33_text_to_speech(
             "speed": speed,
             "with_transcript": with_transcript,
             "file_name": file_name,
+            "pronunciation_dictionary_id": pronunciation_dictionary_id,
         }
     )
     response = await _api("POST", "/v3/text-to-speech", form=form)
@@ -417,6 +449,10 @@ async def ai33_create_dialogue(
     delay: Annotated[float, Field(ge=0, le=5, description="Gap between speaker turns in seconds.")] = 0,
     with_transcript: bool = False,
     file_name: Optional[str] = None,
+    pronunciation_dictionary_id: Annotated[
+        Optional[int],
+        Field(description="Apply a pronunciation dictionary to all lines; speaker labels are untouched."),
+    ] = None,
     wait_seconds: Annotated[int, Field(ge=0, le=MAX_WAIT_SECONDS)] = 120,
 ) -> dict:
     """Generate multi-speaker dialogue audio from labeled text (costs credits)."""
@@ -431,6 +467,7 @@ async def ai33_create_dialogue(
             "delay": delay,
             "with_transcript": with_transcript,
             "file_name": file_name,
+            "pronunciation_dictionary_id": pronunciation_dictionary_id,
         }
     )
     response = await _api("POST", "/v3/text-to-speech/dialogue", form=form)
@@ -523,12 +560,27 @@ async def ai33_dub_audio(
     allow_voice_cloning: Annotated[
         bool, Field(description="Clone the original voices into the target language.")
     ] = False,
+    replacement_voice_id: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "Optional prefixed v3 voice ID (elevenlabs_/minimax_/clone_/edge_/vbee_/fishaudio_; "
+                "kokoro not supported). Synthesizes the dubbed SRT once more with this voice and "
+                "returns it as replacement_audio_url (voice-only, no background audio). Adds 25% "
+                "to the dubbing credit cost."
+            )
+        ),
+    ] = None,
     wait_seconds: Annotated[int, Field(ge=0, le=MAX_WAIT_SECONDS)] = 0,
 ) -> dict:
     """Dub audio into another language (costs credits; can take several minutes).
 
     Defaults to returning the task_id immediately; poll with ai33_wait_for_task.
     """
+    if replacement_voice_id is not None:
+        _validate_voice_id(replacement_voice_id)
+        if replacement_voice_id.startswith("kokoro_"):
+            raise ValueError("Kokoro voices are not supported as dubbing replacement voices.")
     name, content, content_type = await _fetch_remote_file(
         audio_url, max_mb=20, default_name="audio.mp3"
     )
@@ -541,9 +593,83 @@ async def ai33_dub_audio(
                 "disable_voice_cloning": not allow_voice_cloning,
                 "source_lang": source_lang,
                 "target_lang": target_lang,
+                "voice_id": replacement_voice_id,
             }
         ),
         files=[("file", (name, content, content_type))],
+    )
+    return await _finish_create(response, wait_seconds)
+
+
+@mcp.tool(annotations=CREATE_TASK)
+async def ai33_voice_changer(
+    audio_url: Annotated[
+        str,
+        Field(description="Public http(s) URL of the audio to transform (mp3/m4a/wav, max 300MB or 5 hours)."),
+    ],
+    voice_id: Annotated[
+        str,
+        Field(description="Target ElevenLabs voice ID (raw, unprefixed), e.g. '21m00Tcm4TlvDq8ikWAM'."),
+    ],
+    model_id: str = "eleven_multilingual_sts_v2",
+    stability: Annotated[float, Field(ge=0, le=1)] = 0.5,
+    similarity_boost: Annotated[float, Field(ge=0, le=1)] = 0.75,
+    style: Annotated[float, Field(ge=0, le=1, description="Expressiveness.")] = 0.2,
+    use_speaker_boost: bool = True,
+    remove_background_noise: bool = False,
+    wait_seconds: Annotated[int, Field(ge=0, le=MAX_WAIT_SECONDS)] = 120,
+) -> dict:
+    """Transform the voice in an audio file to another voice, speech-to-speech (costs credits).
+
+    Only use on audio you have rights and consent to transform.
+    """
+    name, content, content_type = await _fetch_remote_file(
+        audio_url, max_mb=300, default_name="audio.mp3"
+    )
+    settings = {
+        "stability": stability,
+        "similarity_boost": similarity_boost,
+        "style": style,
+        "use_speaker_boost": use_speaker_boost,
+    }
+    response = await _api(
+        "POST",
+        "/v1/task/voice-changer",
+        form=_form_fields(
+            {
+                "voice_id": voice_id,
+                "model_id": model_id,
+                "voice_settings": settings,
+                "remove_background_noise": remove_background_noise,
+            }
+        ),
+        files=[("file", (name, content, content_type))],
+    )
+    return await _finish_create(response, wait_seconds)
+
+
+@mcp.tool(annotations=CREATE_TASK)
+async def ai33_voice_isolate(
+    audio_url: Annotated[
+        str,
+        Field(
+            description=(
+                "Public http(s) URL of the audio to clean (mp3/m4a/wav, max 300MB or "
+                "5 hours, minimum 5 seconds)."
+            )
+        ),
+    ],
+    wait_seconds: Annotated[int, Field(ge=0, le=MAX_WAIT_SECONDS)] = 120,
+) -> dict:
+    """Isolate speech from background noise in an audio file (costs credits).
+
+    Useful before transcription or dubbing when the source is noisy.
+    """
+    name, content, content_type = await _fetch_remote_file(
+        audio_url, max_mb=300, default_name="audio.mp3"
+    )
+    response = await _api(
+        "POST", "/v1/task/voice-isolate", files=[("file", (name, content, content_type))]
     )
     return await _finish_create(response, wait_seconds)
 
@@ -631,6 +757,71 @@ async def ai33_generate_music(
     return await _finish_create(response, wait_seconds)
 
 
+@mcp.tool(annotations=CREATE_TASK)
+async def ai33_generate_suno_music(
+    description: Annotated[
+        Optional[str],
+        Field(
+            min_length=1,
+            max_length=500,
+            description=(
+                "Simple mode: short song description, e.g. 'Percussive indie pop song "
+                "about the border between two lives'. Required unless lyrics or "
+                "style_tags are provided."
+            ),
+        ),
+    ] = None,
+    make_instrumental: Annotated[
+        bool, Field(description="Simple mode only: generate without vocals.")
+    ] = False,
+    title: Annotated[Optional[str], Field(max_length=80, description="Custom mode: song title.")] = None,
+    lyrics: Annotated[
+        Optional[str],
+        Field(max_length=5000, description="Custom mode: full lyrics, e.g. '[Verse 1]\\n...'."),
+    ] = None,
+    style_tags: Annotated[
+        Optional[str],
+        Field(max_length=1000, description="Custom mode: style tags, e.g. 'indie pop, emotional, cinematic drums'."),
+    ] = None,
+    vocal_gender: Annotated[
+        Optional[Literal["f", "m"]], Field(description="Custom mode: vocal gender.")
+    ] = None,
+    wait_seconds: Annotated[int, Field(ge=0, le=MAX_WAIT_SECONDS)] = 0,
+) -> dict:
+    """Generate songs with Suno (costs credits; takes minutes; returns 2 clips).
+
+    Two modes, picked automatically: simple mode (just a description) or custom
+    mode (lyrics and/or style_tags, plus optional title and vocal_gender).
+    Defaults to returning the task_id immediately; poll with ai33_wait_for_task.
+    While processing, preview_stream_urls may be available; final tracks appear
+    in asset_urls when status is 'done'.
+    """
+    custom = bool(lyrics or style_tags or title or vocal_gender)
+    if custom:
+        if not lyrics and not style_tags:
+            raise ValueError("Custom mode needs 'lyrics' and/or 'style_tags'.")
+        payload = {
+            "create_mode": "custom",
+            "title": title or "",
+            "lyrics": lyrics or "",
+            "tags": style_tags or "",
+        }
+        if vocal_gender:
+            payload["vocal_gender"] = vocal_gender
+    else:
+        if not description:
+            raise ValueError(
+                "Provide 'description' (simple mode) or 'lyrics'/'style_tags' (custom mode)."
+            )
+        payload = {
+            "create_mode": "simple",
+            "gpt_description_prompt": description,
+            "make_instrumental": make_instrumental,
+        }
+    response = await _api("POST", "/v1s/task/music-generation", json_body=payload)
+    return await _finish_create(response, wait_seconds)
+
+
 # ---------------------------------------------------------------------------
 # Image tools
 # ---------------------------------------------------------------------------
@@ -710,6 +901,82 @@ async def ai33_generate_image(
     )
     response = await _api("POST", "/v1i/task/generate-image", form=form, files=files or None)
     return await _finish_create(response, wait_seconds)
+
+
+# ---------------------------------------------------------------------------
+# Pronunciation dictionary tools
+# ---------------------------------------------------------------------------
+
+
+class DictionaryRule(BaseModel):
+    from_text: str = Field(description="Text to match, e.g. 'AI'.")
+    to_text: str = Field(description="Replacement to speak instead, e.g. 'Ay Eye'.")
+    match_type: Literal["word", "contains"] = Field(
+        "word", description="'word' matches whole words; 'contains' matches substrings."
+    )
+    case_sensitive: bool = False
+
+    def payload(self) -> dict:
+        return {
+            "from": self.from_text,
+            "to": self.to_text,
+            "matchType": self.match_type,
+            "caseSensitive": self.case_sensitive,
+        }
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def ai33_list_dictionaries() -> dict:
+    """List your pronunciation dictionaries.
+
+    Use a dictionary's id as pronunciation_dictionary_id in ai33_text_to_speech
+    or ai33_create_dialogue to fix how brand names, acronyms, or foreign words
+    are spoken. Only the audio changes; the text stays as given.
+    """
+    return await _api("GET", "/v3/dictionaries")
+
+
+@mcp.tool(annotations=CREATE_TASK)
+async def ai33_create_dictionary(
+    name: Annotated[str, Field(min_length=1, description="Dictionary name, e.g. 'Brand names'.")],
+    rules: Annotated[list[DictionaryRule], Field(min_length=1)],
+) -> dict:
+    """Create a pronunciation dictionary of text-replacement rules."""
+    payload = {"name": name, "rules": [rule.payload() for rule in rules]}
+    return await _api("POST", "/v3/dictionaries", json_body=payload)
+
+
+@mcp.tool(annotations=CREATE_TASK)
+async def ai33_update_dictionary(
+    dictionary_id: int,
+    name: Optional[str] = None,
+    rules: Optional[list[DictionaryRule]] = None,
+) -> dict:
+    """Update a pronunciation dictionary's name and/or rules."""
+    payload: dict[str, Any] = {}
+    if name is not None:
+        payload["name"] = name
+    if rules is not None:
+        payload["rules"] = [rule.payload() for rule in rules]
+    if not payload:
+        raise ValueError("Provide 'name' and/or 'rules' to update.")
+    return await _api("PUT", f"/v3/dictionaries/{dictionary_id}", json_body=payload)
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
+async def ai33_delete_dictionary(dictionary_id: int) -> dict:
+    """Delete a pronunciation dictionary."""
+    return await _api("DELETE", f"/v3/dictionaries/{dictionary_id}")
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def ai33_preview_dictionary(
+    text: Annotated[str, Field(min_length=1, description="Text to run the rules against.")],
+    rules: Annotated[list[DictionaryRule], Field(min_length=1)],
+) -> dict:
+    """Preview how dictionary rules would rewrite text before synthesis (no credits)."""
+    payload = {"text": text, "rules": [rule.payload() for rule in rules]}
+    return await _api("POST", "/v3/dictionaries/preview", json_body=payload)
 
 
 # ---------------------------------------------------------------------------

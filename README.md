@@ -30,10 +30,13 @@ https://pima5-ai33-mcp.hf.space/mcp
 | `ai33_text_to_speech` | TTS with any prefixed v3 voice |
 | `ai33_create_dialogue` | Multi-speaker dialogue audio |
 | `ai33_clone_voice` / `ai33_delete_cloned_voice` | Voice cloning from an audio URL |
+| `ai33_voice_changer` / `ai33_voice_isolate` | Speech-to-speech voice transform, noise isolation |
 | `ai33_speech_to_text` | Transcription (SRT + word-level JSON) |
-| `ai33_dub_audio` | Dubbing into another language |
+| `ai33_dub_audio` | Dubbing into another language, optional replacement voice |
 | `ai33_generate_sound_effect` | Sound effects from text |
+| `ai33_generate_suno_music` | Suno song generation (simple + custom modes) |
 | `ai33_generate_music` | Music generation (MiniMax) |
+| `ai33_list_dictionaries` / `ai33_create_dictionary` / `ai33_update_dictionary` / `ai33_delete_dictionary` / `ai33_preview_dictionary` | Pronunciation dictionaries |
 | `ai33_list_image_models` / `ai33_get_image_price` / `ai33_generate_image` | Image generation with reference-image support |
 | `ai33_get_task` / `ai33_wait_for_task` / `ai33_list_tasks` / `ai33_delete_tasks` | Task management |
 
