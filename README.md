@@ -12,7 +12,7 @@ short_description: MCP server for the AI33 Pro media generation API
 
 # AI33 Pro MCP Server
 
-An MCP (Model Context Protocol) server exposing the [AI33 Pro](https://ai33.pro) media API as tools, served over streamable HTTP. Based on the [codexflows](https://github.com/fozagtx/codexflows) AI33 Pro skill.
+An MCP (Model Context Protocol) server exposing the [AI33 Pro](https://ai33.pro) media API as tools, served over streamable HTTP, plus live YouTube research tools (YouTube Data API v3). Based on the [codexflows](https://github.com/fozagtx/codexflows) AI33 Pro skill and the [AuspexIQ](https://github.com/fozagtx/AuspexIQ) analysis engine (payment layer removed — the YouTube key is free).
 
 ## Endpoint
 
@@ -20,7 +20,41 @@ An MCP (Model Context Protocol) server exposing the [AI33 Pro](https://ai33.pro)
 https://pima5-ai33-mcp.hf.space/mcp
 ```
 
-## Tools
+Transport: streamable HTTP (stateless). Works with any MCP client that supports remote HTTP servers.
+
+## Connect from the Claude app (claude.ai / desktop)
+
+1. Open **Settings → Connectors** (on claude.ai: `claude.ai/settings/connectors`).
+2. Click **Add custom connector**.
+3. Name: `ai33`, URL: `https://pima5-ai33-mcp.hf.space/mcp`.
+4. Save, then enable the connector in a chat via the search & tools menu. The AI33 key is already configured server-side, so no key entry is needed.
+
+## Connect from Claude Code (CLI)
+
+```bash
+claude mcp add --transport http ai33 https://pima5-ai33-mcp.hf.space/mcp
+```
+
+## Connect from any other MCP client (JSON config)
+
+```json
+{
+  "mcpServers": {
+    "ai33": {
+      "type": "http",
+      "url": "https://pima5-ai33-mcp.hf.space/mcp",
+      "headers": {
+        "xi-api-key": "YOUR_AI33_API_KEY",
+        "x-youtube-api-key": "YOUR_YOUTUBE_API_KEY"
+      }
+    }
+  }
+}
+```
+
+The `headers` block is optional — keys configured as Space secrets are used when a header is absent.
+
+## AI33 media tools
 
 | Tool | Purpose |
 |---|---|
@@ -42,44 +76,46 @@ https://pima5-ai33-mcp.hf.space/mcp
 
 Generation tools return a `task_id` and can optionally wait for completion (`wait_seconds`). Completed tasks include an `asset_urls` list with downloadable outputs. Since the server runs remotely, file inputs (voice samples, audio to transcribe or dub, reference images) are passed as public URLs.
 
+## YouTube research tools
+
+Live YouTube Data API v3 analysis — every number comes from a live API call (or a short-TTL cache). Failures return structured `{"ok": false, "error": {...}}` objects, never fabricated data.
+
+| Tool | What it does | Quota cost (uncached) |
+|---|---|---|
+| `youtube_search` | Search videos; compact results with live view/like/comment counts | ~101 units |
+| `youtube_scan_niche` | Niche assessment: saturation score, outlier videos vs each channel's own baseline, ENTER/CROWDED/AVOID verdict | ~122 units |
+| `youtube_channel_outliers` | Which of a channel's recent videos overperformed its own baseline (accepts `UC...` ID, `@handle`, or channel URL) | ~5 units |
+| `youtube_video_context` | Explain one video's performance: outlier multiple, percentile, views/day velocity, MEGA_OUTLIER→UNDERPERFORMER classification | ~4 units |
+| `youtube_rising_channels` | Fastest-rising channels in a niche by recent-median vs lifetime-average momentum | ~132 units |
+
 ## Authentication
 
-Every request needs an AI33 API key, resolved in this order:
+**AI33 tools** — an AI33 API key, resolved in this order:
 
 1. `xi-api-key` request header (also accepts `x-ai33-api-key`, `x-api-key`, or `Authorization: Bearer`)
 2. `AI33_API_KEY` environment variable (set as a Space secret)
 
-If you duplicate this Space, add your own `AI33_API_KEY` secret in the Space settings so clients can connect without sending a header.
+**YouTube tools** — a free YouTube Data API v3 key (Google Cloud Console → enable "YouTube Data API v3" → Credentials → Create API key; 10,000 quota units/day, no billing required):
 
-## Client configuration
+1. `x-youtube-api-key` request header
+2. `YOUTUBE_API_KEY` (or `YT_API_KEY`) environment variable / Space secret
 
-For any MCP client that supports streamable HTTP:
-
-```json
-{
-  "mcpServers": {
-    "ai33": {
-      "type": "http",
-      "url": "https://pima5-ai33-mcp.hf.space/mcp",
-      "headers": { "xi-api-key": "YOUR_AI33_API_KEY" }
-    }
-  }
-}
-```
+If you duplicate this Space, add your own secrets in the Space settings so clients can connect without sending headers.
 
 ## Run locally
 
 ```bash
 pip install -r requirements.txt
 export AI33_API_KEY="your-key"
+export YOUTUBE_API_KEY="your-youtube-key"   # optional, for the youtube_* tools
 python server.py
 # MCP endpoint at http://localhost:7860/mcp
 ```
 
 ## Deploy your own
 
-The whole server is four files: `server.py`, `Dockerfile`, `requirements.txt`, and this `README.md` (its frontmatter configures the Space).
+The whole server is five files: `server.py`, `youtube_tools.py`, `Dockerfile`, `requirements.txt`, and this `README.md` (its frontmatter configures the Space).
 
 1. [Duplicate the Space](https://huggingface.co/spaces/pima5/ai33-mcp?duplicate=true) or create a new Docker Space and upload the files.
-2. Add an `AI33_API_KEY` secret in the Space settings (or skip it and require clients to send the `xi-api-key` header).
+2. Add `AI33_API_KEY` and `YOUTUBE_API_KEY` secrets in the Space settings (or skip them and require clients to send the keys as headers).
 3. Your endpoint is `https://<user>-<space>.hf.space/mcp`.

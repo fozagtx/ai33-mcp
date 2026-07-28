@@ -49,9 +49,14 @@ mcp = FastMCP(
         "wait_seconds parameter and, when the task finishes in time, return the "
         "completed task with an asset_urls list of downloadable outputs. If a task "
         "is still running, keep polling with ai33_wait_for_task or ai33_get_task.\n\n"
-        "Every call needs an AI33 API key: send an 'xi-api-key' request header, or "
-        "rely on the AI33_API_KEY environment variable configured on the server. "
-        "Check remaining credits with ai33_get_credits."
+        "Every ai33_* call needs an AI33 API key: send an 'xi-api-key' request "
+        "header, or rely on the AI33_API_KEY environment variable configured on "
+        "the server. Check remaining credits with ai33_get_credits.\n\n"
+        "The youtube_* tools provide live YouTube Data API v3 research: search, "
+        "niche saturation scans with ENTER/CROWDED/AVOID verdicts, channel outlier "
+        "audits, single-video performance context, and rising-channel radar. They "
+        "need a free YouTube Data API key ('x-youtube-api-key' header or the "
+        "YOUTUBE_API_KEY environment variable)."
     ),
     host="0.0.0.0",
     port=PORT,
@@ -1043,6 +1048,15 @@ async def ai33_delete_tasks(
 ) -> dict:
     """Delete (or refund, where eligible) one or more tasks. This cannot be undone."""
     return await _api("POST", "/v1/task/delete", json_body={"task_ids": task_ids})
+
+
+# ---------------------------------------------------------------------------
+# YouTube tools (ported from AuspexIQ, payment layer removed)
+# ---------------------------------------------------------------------------
+
+import youtube_tools
+
+youtube_tools.register(mcp, READ_ONLY, lambda: _REQUEST_HEADERS.get())
 
 
 # ---------------------------------------------------------------------------
