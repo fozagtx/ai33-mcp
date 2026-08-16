@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AI33 Pro MCP server.
+"""AI33 Pro MCP server (2026-08-16).
 
 Exposes the AI33 Pro media API (https://api.ai33.pro) as MCP tools over
 streamable HTTP: text-to-speech, multi-speaker dialogue, voice cloning,
@@ -94,7 +94,7 @@ def _http() -> httpx.AsyncClient:
         _client = httpx.AsyncClient(
             timeout=httpx.Timeout(300.0, connect=30.0),
             follow_redirects=True,
-            headers={"User-Agent": "ai33-mcp/1.0"},
+            headers={"User-Agent": "ai33-mcp/2026.8.16"},
         )
     return _client
 

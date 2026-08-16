@@ -1,4 +1,4 @@
-"""YouTube Data API v3 tools (ported from AuspexIQ, payment layer removed).
+"""YouTube Data API v3 tools (ported from AuspexIQ, payment layer removed) — 2026-08-16.
 
 Live YouTube niche analysis: search, niche saturation scans, channel outlier
 audits, single-video context, and rising-channel radar. Every number comes from
