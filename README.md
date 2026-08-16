@@ -18,6 +18,10 @@ tags:
 
 # mediagen
 
+<p align="center">
+  <img src="docs/mediagen-logo.png" alt="mediagen logo" width="220" />
+</p>
+
 A media and content MCP for busy 9-to-5 people. Connect it once in Claude, then make voice, music, images, and YouTube research from your phone without opening five other sites.
 
 This is not a generic skill. It is a live tool server. You ask. The tools run. You keep moving.
