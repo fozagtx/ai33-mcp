@@ -49,15 +49,29 @@ docker build -t ai33-mcp .
 docker run --rm -p 7860:7860 -e AI33_API_KEY=your-key ai33-mcp
 ```
 
-## Usage
+## MCP URL
 
-### Claude app
+```
+https://pima5-ai33-mcp.hf.space/mcp
+```
 
-1. Settings → Connectors → Add custom connector
-2. Name: `ai33`
-3. URL: `https://pima5-ai33-mcp.hf.space/mcp`
+Transport: streamable HTTP (stateless).
 
-### Claude Code
+## Add to Claude
+
+### Claude.ai / Claude desktop (Connectors)
+
+1. Open [Claude Settings → Connectors](https://claude.ai/settings/connectors) (desktop: **Settings → Connectors**).
+2. Click **Add custom connector**.
+3. Set:
+   - **Name:** `ai33`
+   - **URL:** `https://pima5-ai33-mcp.hf.space/mcp`
+4. Save the connector.
+5. In a chat, open the tools / search menu and enable the `ai33` connector.
+
+The AI33 key is already configured as a Space secret on this deployment, so you usually do not need to paste a key in Claude.
+
+### Claude Code (CLI)
 
 ```bash
 claude mcp add --transport http ai33 https://pima5-ai33-mcp.hf.space/mcp
