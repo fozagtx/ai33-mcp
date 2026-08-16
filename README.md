@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 pinned: false
 license: mit
-short_description: MCP server for AI33 Pro media + live YouTube research
+short_description: Give Claude AI33 voice/media tools + live YouTube research
 tags:
   - mcp
   - agi
@@ -17,61 +17,40 @@ tags:
 
 # AI33 MCP
 
-Remote [MCP](https://modelcontextprotocol.io) server for the [AI33 Pro](https://ai33.pro) media API (TTS, dialogue, clone, STT, dubbing, SFX, music, images) plus live YouTube Data API v3 research tools. Streamable HTTP. Updated **2026-08-16**.
+Plug [AI33 Pro](https://ai33.pro) into Claude (or any MCP client) so your assistant can make voice, music, and images — and check YouTube niches with live data — without you leaving the chat.
 
-**Live endpoint:** https://pima5-ai33-mcp.hf.space/mcp
+**MCP URL:** `https://pima5-ai33-mcp.hf.space/mcp`
 
-## Features
+## Who this is for
 
-- AI33 Pro media tools over streamable HTTP (`/mcp`)
-- Live YouTube niche/outlier research (`youtube_*` tools)
-- Optional server-side keys via Space secrets; clients can also send headers
+- Creators and editors who already use Claude and want TTS, dubbing, voice clone, SFX, music, or images without hopping into another dashboard
+- YouTube builders who want niche saturation, outlier videos, and rising channels pulled from the live API instead of guesswork
+- Devs wiring the same tools into Cursor, Claude Code, or any MCP client
 
-## Prerequisites
+## What you get
 
-- Python 3.12+
-- An [AI33 Pro](https://ai33.pro) API key (for `ai33_*` tools)
-- Optional: a free [YouTube Data API v3](https://console.cloud.google.com/) key (for `youtube_*` tools)
+Ask Claude (with this connector on) to things like:
 
-## Getting started
+- “Read this script in a MiniMax voice and give me the audio link”
+- “Dub this clip into Spanish”
+- “Is ‘sleep stories’ worth entering, or is it crowded?”
+- “Which recent videos on @veritasium are outliers vs their usual baseline?”
 
-```bash
-pip install -r requirements.txt
-export AI33_API_KEY="your-key"
-export YOUTUBE_API_KEY="your-youtube-key"   # optional
-python server.py
-# MCP: http://localhost:7860/mcp
-```
-Docker (same layout as the Hugging Face Space):
+Media jobs return a `task_id` and downloadable asset URLs. YouTube tools only return numbers from live API calls (or a short cache) — they don’t invent stats.
 
-```bash
-docker build -t ai33-mcp .
-docker run --rm -p 7860:7860 -e AI33_API_KEY=your-key ai33-mcp
-```
+## Add it to Claude
 
-## MCP URL
+### Claude.ai / Claude desktop
 
-```
-https://pima5-ai33-mcp.hf.space/mcp
-```
+1. Open [Settings → Connectors](https://claude.ai/settings/connectors)
+2. **Add custom connector**
+3. Name: `ai33`
+4. URL: `https://pima5-ai33-mcp.hf.space/mcp`
+5. Save, then in a chat turn on the `ai33` connector from the tools menu
 
-Transport: streamable HTTP (stateless).
+This hosted Space already has the AI33 key set as a secret, so you usually don’t paste a key in Claude.
 
-## Add to Claude
-
-### Claude.ai / Claude desktop (Connectors)
-
-1. Open [Claude Settings → Connectors](https://claude.ai/settings/connectors) (desktop: **Settings → Connectors**).
-2. Click **Add custom connector**.
-3. Set:
-   - **Name:** `ai33`
-   - **URL:** `https://pima5-ai33-mcp.hf.space/mcp`
-4. Save the connector.
-5. In a chat, open the tools / search menu and enable the `ai33` connector.
-
-The AI33 key is already configured as a Space secret on this deployment, so you usually do not need to paste a key in Claude.
-
-### Claude Code (CLI)
+### Claude Code
 
 ```bash
 claude mcp add --transport http ai33 https://pima5-ai33-mcp.hf.space/mcp
@@ -94,38 +73,46 @@ claude mcp add --transport http ai33 https://pima5-ai33-mcp.hf.space/mcp
 }
 ```
 
-`headers` are optional when the matching Space secrets are set.
+Headers are optional if those keys are set as Space secrets. File inputs (samples, audio, reference images) need public URLs.
 
-Generation tools return a `task_id` (and can wait via `wait_seconds`). File inputs must be public URLs.
+## Run it yourself
 
-## Configuration
+Needs Python 3.12+, an [AI33](https://ai33.pro) key, and optionally a free [YouTube Data API v3](https://console.cloud.google.com/) key.
 
-| Variable / header | Purpose |
+```bash
+pip install -r requirements.txt
+export AI33_API_KEY="your-key"
+export YOUTUBE_API_KEY="your-youtube-key"   # optional
+python server.py
+# http://localhost:7860/mcp
+```
+
+```bash
+docker build -t ai33-mcp .
+docker run --rm -p 7860:7860 -e AI33_API_KEY=your-key ai33-mcp
+```
+
+| Key | Used for |
 |---|---|
-| `AI33_API_KEY` or `xi-api-key` | AI33 media tools |
-| `YOUTUBE_API_KEY` / `YT_API_KEY` or `x-youtube-api-key` | YouTube research tools |
-| `PORT` | Listen port (default `7860`) |
-| `AI33_API_BASE` | Override API host (default `https://api.ai33.pro`) |
+| `AI33_API_KEY` or header `xi-api-key` | Media tools |
+| `YOUTUBE_API_KEY` / `YT_API_KEY` or header `x-youtube-api-key` | YouTube tools |
+| `PORT` | Default `7860` |
 
-Header aliases for AI33: `x-ai33-api-key`, `x-api-key`, or `Authorization: Bearer …`.
+## Tools (short list)
 
-## Tools
+Media: voices, TTS, dialogue, clone, STT, dubbing, voice change/isolate, SFX, MiniMax + Suno music, images, pronunciation dictionaries, tasks.
 
-**AI33:** `ai33_health`, `ai33_get_credits`, `ai33_list_voices`, `ai33_text_to_speech`, `ai33_create_dialogue`, `ai33_clone_voice`, `ai33_delete_cloned_voice`, `ai33_speech_to_text`, `ai33_dub_audio`, `ai33_voice_changer`, `ai33_voice_isolate`, `ai33_generate_sound_effect`, `ai33_generate_music`, `ai33_generate_suno_music`, pronunciation dictionary helpers, image helpers, task helpers.
+YouTube: `youtube_search`, `youtube_scan_niche`, `youtube_channel_outliers`, `youtube_video_context`, `youtube_rising_channels`.
 
-**YouTube:** `youtube_search`, `youtube_scan_niche`, `youtube_channel_outliers`, `youtube_video_context`, `youtube_rising_channels` (live API data only; failures return structured errors).
+## Host your own copy
 
-## Deploy
+1. [Duplicate the Space](https://huggingface.co/spaces/pima5/ai33-mcp?duplicate=true)
+2. Add your `AI33_API_KEY` (and optional `YOUTUBE_API_KEY`) secrets
+3. Point your client at `https://<user>-<space>.hf.space/mcp`
 
-This README’s YAML frontmatter configures the Hugging Face Docker Space.
+## If something breaks
 
-1. [Duplicate the Space](https://huggingface.co/spaces/pima5/ai33-mcp?duplicate=true) or create a Docker Space and upload these files
-2. Set `AI33_API_KEY` and optional `YOUTUBE_API_KEY` secrets
-3. Endpoint: `https://<user>-<space>.hf.space/mcp`
-
-## Troubleshooting
-
-- **401 on AI33 tools** — missing/invalid key; check `ai33_get_credits`
-- **YouTube tools fail with missing key** — set `YOUTUBE_API_KEY` or send `x-youtube-api-key`
-- **Space returns 503** — Space is paused/sleeping; open the Space page and restart
-- **`/mcp` returns 406 in a browser** — expected; use an MCP client with streamable HTTP
+- **401 on media tools** — bad or missing AI33 key; try `ai33_get_credits`
+- **YouTube tools complain about a key** — set `YOUTUBE_API_KEY` or send `x-youtube-api-key`
+- **503 from the Space** — it’s paused; open the Space and hit Restart
+- **Browser shows 406 on `/mcp`** — normal; use Claude or another MCP client, not the address bar
