@@ -22,6 +22,14 @@ A media and content MCP for busy 9-to-5 people. Connect it once in Claude, then 
 
 This is not a generic skill. It is a live tool server. You ask. The tools run. You keep moving.
 
+<p align="center">
+  <img src="docs/mediagen.png" alt="mediagen tools on phone" width="260" />
+  &nbsp;&nbsp;
+  <img src="docs/mediagen-tools.png" alt="mediagen video tools on phone" width="260" />
+</p>
+
+<p align="center"><em>On your phone: open Claude, pick a tool, tap Ask. No extra site.</em></p>
+
 **MCP URL:** `https://pima5-ai33-mcp.hf.space/mcp`
 
 ## Who it helps
@@ -35,14 +43,6 @@ If Claude is already open on your phone, that is enough.
 - Generate speech, dialogue, clones, dubs, SFX, music, and images
 - Research niches live on YouTube (saturation, outliers, rising channels)
 - Stay in one chat instead of multitasking across dashboards
-
-<p align="center">
-  <img src="docs/mediagen.png" alt="mediagen tools on phone" width="260" />
-  &nbsp;&nbsp;
-  <img src="docs/mediagen-tools.png" alt="mediagen video tools on phone" width="260" />
-</p>
-
-<p align="center"><em>On your phone: open Claude, pick a tool, tap Ask. No extra site.</em></p>
 
 ## Add it to Claude (2 minutes)
 
