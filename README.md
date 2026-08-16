@@ -1,5 +1,5 @@
 ---
-title: AI33 MCP
+title: mediagen
 emoji: ⚡
 colorFrom: gray
 colorTo: green
@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 pinned: false
 license: mit
-short_description: Phone-ready media & content MCP for busy creators
+short_description: Phone-ready media and content MCP for busy creators
 tags:
   - mcp
   - media
@@ -16,33 +16,33 @@ tags:
   - audio
 ---
 
-# AI33 MCP — a content machine in your pocket
+# mediagen
 
-This is not a “generic skill.” It’s a **media & content MCP** you connect once, then run from Claude on your phone: voice, music, images, YouTube research, and the rest of the content workflow — without opening five other sites between meetings.
+A media and content MCP for busy 9-to-5 people. Connect it once in Claude, then make voice, music, images, and YouTube research from your phone without opening five other sites.
 
-Built for busy 9-to-5 people who still want to ship content. You ask. The tools run. You keep moving.
+This is not a generic skill. It is a live tool server. You ask. The tools run. You keep moving.
 
 **MCP URL:** `https://pima5-ai33-mcp.hf.space/mcp`
 
 ## Who it helps
 
-People who create after work, on the commute, or between Slack pings — and don’t have time to bounce between AI33, YouTube Studio, editors, and download tabs.
+Creators who ship after work, on the commute, or between Slack pings, and do not have time to bounce between AI33, YouTube Studio, editors, and download tabs.
 
-If Claude is already open on your phone, that’s enough.
+If Claude is already open on your phone, that is enough.
 
 ## What you can do
-
-Once it’s connected, you can:
 
 - Generate speech, dialogue, clones, dubs, SFX, music, and images
 - Research niches live on YouTube (saturation, outliers, rising channels)
 - Stay in one chat instead of multitasking across dashboards
 
 <p align="center">
-  <img src="docs/media-gen.png" alt="media-gen tools on phone" width="300" />
+  <img src="docs/mediagen.png" alt="mediagen tools on phone" width="260" />
+  &nbsp;&nbsp;
+  <img src="docs/mediagen-tools.png" alt="mediagen video tools on phone" width="260" />
 </p>
 
-<p align="center"><em>On your phone: open Claude, pick a tool, tap Ask — no extra site.</em></p>
+<p align="center"><em>On your phone: open Claude, pick a tool, tap Ask. No extra site.</em></p>
 
 ## Add it to Claude (2 minutes)
 
@@ -50,16 +50,16 @@ Once it’s connected, you can:
 
 1. Open [Settings → Connectors](https://claude.ai/settings/connectors)
 2. **Add custom connector**
-3. Name: `ai33` (or `media-gen` if you prefer)
+3. Name: `mediagen`
 4. URL: `https://pima5-ai33-mcp.hf.space/mcp`
 5. Save, then enable it in a chat from the tools menu
 
-This Space already has the AI33 key set as a secret, so you usually don’t paste a key.
+This Space already has the AI33 key set as a secret, so you usually do not paste a key.
 
 ### Claude Code
 
 ```bash
-claude mcp add --transport http ai33 https://pima5-ai33-mcp.hf.space/mcp
+claude mcp add --transport http mediagen https://pima5-ai33-mcp.hf.space/mcp
 ```
 
 ### Other MCP clients
@@ -67,7 +67,7 @@ claude mcp add --transport http ai33 https://pima5-ai33-mcp.hf.space/mcp
 ```json
 {
   "mcpServers": {
-    "ai33": {
+    "mediagen": {
       "type": "http",
       "url": "https://pima5-ai33-mcp.hf.space/mcp",
       "headers": {
@@ -83,13 +83,13 @@ Headers are optional when those keys are Space secrets. For file inputs (voice s
 
 ## Why this beats a normal skill
 
-A skill is a prompt. This is a **live tool server**:
+A skill is a prompt. mediagen is a live tool server:
 
 - Real AI33 Pro media jobs with downloadable outputs
 - Real YouTube Data API numbers (no invented view counts)
 - Works over streamable HTTP so Claude on mobile can call it like any other connector
 
-You’re not “remembering steps.” You’re pressing Ask and getting assets/research back.
+You are not remembering steps. You press Ask and get assets or research back.
 
 ## Run your own
 
@@ -104,8 +104,8 @@ python server.py
 ```
 
 ```bash
-docker build -t ai33-mcp .
-docker run --rm -p 7860:7860 -e AI33_API_KEY=your-key ai33-mcp
+docker build -t mediagen .
+docker run --rm -p 7860:7860 -e AI33_API_KEY=your-key mediagen
 ```
 
 | Key | For |
@@ -116,7 +116,7 @@ docker run --rm -p 7860:7860 -e AI33_API_KEY=your-key ai33-mcp
 
 ## Tool map
 
-**Media (AI33):** voices, TTS, dialogue, clone, STT, dubbing, voice change/isolate, SFX, MiniMax + Suno music, images, pronunciation dictionaries, tasks.
+**Media:** voices, TTS, dialogue, clone, STT, dubbing, voice change/isolate, SFX, MiniMax + Suno music, images, pronunciation dictionaries, tasks.
 
 **YouTube research:** `youtube_search`, `youtube_scan_niche`, `youtube_channel_outliers`, `youtube_video_context`, `youtube_rising_channels`.
 
@@ -128,7 +128,7 @@ docker run --rm -p 7860:7860 -e AI33_API_KEY=your-key ai33-mcp
 
 ## Stuck?
 
-- **401 on media** — check the AI33 key / `ai33_get_credits`
-- **YouTube key missing** — set `YOUTUBE_API_KEY` or send `x-youtube-api-key`
-- **503** — Space is paused; open it and Restart
-- **Browser 406 on `/mcp`** — use Claude, not the address bar
+- **401 on media:** check the AI33 key / `ai33_get_credits`
+- **YouTube key missing:** set `YOUTUBE_API_KEY` or send `x-youtube-api-key`
+- **503:** Space is paused; open it and Restart
+- **Browser 406 on `/mcp`:** use Claude, not the address bar
