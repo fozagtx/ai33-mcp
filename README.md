@@ -17,7 +17,7 @@ tags:
 
 # AI33 MCP
 
-Remote [MCP](https://modelcontextprotocol.io) server for the [AI33 Pro](https://ai33.pro) media API (TTS, dialogue, clone, STT, dubbing, SFX, music, images) plus live YouTube Data API v3 research tools. Streamable HTTP.
+Remote [MCP](https://modelcontextprotocol.io) server for the [AI33 Pro](https://ai33.pro) media API (TTS, dialogue, clone, STT, dubbing, SFX, music, images) plus live YouTube Data API v3 research tools. Streamable HTTP. Updated **2026-08-16**.
 
 **Live endpoint:** https://pima5-ai33-mcp.hf.space/mcp
 
